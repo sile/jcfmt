@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::io::StdoutLock;
+use std::ops::Range;
 
 fn main() -> noargs::Result<()> {
     let mut args = noargs::raw_args();
@@ -12,15 +14,42 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
-    let mut input_files = Vec::new();
-    while let Some(a) = noargs::arg("[INPUT_FILE]...").take(&mut args).present() {
-        input_files.push(PathBuf::from(a.value()));
-    }
+    // TODO: "--strip-comments"
 
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(());
     }
 
+    let text = std::io::read_to_string(std::io::stdin())?;
+    let (json, comment_ranges) = nojson::RawJson::parse_jsonc(&text)?;
+    let stdout = std::io::stdout();
+    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock());
+    formatter.format(json.value())?;
+
     Ok(())
+}
+
+#[derive(Debug)]
+struct Formatter<'a> {
+    text: &'a str,
+    comment_ranges: BTreeMap<usize, usize>,
+    stdout: StdoutLock<'a>,
+}
+
+impl<'a> Formatter<'a> {
+    fn new(text: &'a str, comment_ranges: Vec<Range<usize>>, stdout: StdoutLock<'a>) -> Self {
+        Self {
+            text,
+            comment_ranges: comment_ranges
+                .into_iter()
+                .map(|r| (r.start, r.end))
+                .collect(),
+            stdout,
+        }
+    }
+
+    fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        todo!()
+    }
 }
