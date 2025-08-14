@@ -1,0 +1,8 @@
+[package]
+name = "jccf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+noargs = "0.4.1"
+nojson = "0.3.3"
