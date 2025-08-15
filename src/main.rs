@@ -14,8 +14,6 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
-    // TODO: "--strip-comments"
-
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(());
@@ -35,6 +33,7 @@ struct Formatter<'a> {
     text: &'a str,
     comment_ranges: BTreeMap<usize, usize>,
     stdout: StdoutLock<'a>,
+    level: usize,
 }
 
 impl<'a> Formatter<'a> {
@@ -46,6 +45,7 @@ impl<'a> Formatter<'a> {
                 .map(|r| (r.start, r.end))
                 .collect(),
             stdout,
+            level: 0,
         }
     }
 
@@ -62,9 +62,35 @@ impl<'a> Formatter<'a> {
             | nojson::JsonValueKind::Integer
             | nojson::JsonValueKind::Float
             | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
-            nojson::JsonValueKind::Array => todo!(),
-            nojson::JsonValueKind::Object => todo!(),
+            nojson::JsonValueKind::Array => self.format_array(value)?,
+            nojson::JsonValueKind::Object => self.format_object(value)?,
         }
+        Ok(())
+    }
+
+    fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        write!(self.stdout, "[")?;
+        for (i, element) in value.to_array().expect("bug").enumerate() {
+            if i > 0 {
+                write!(self.stdout, ",")?;
+            }
+            self.format_value(element)?;
+        }
+        write!(self.stdout, "]")?;
+        Ok(())
+    }
+
+    fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        write!(self.stdout, "{{")?;
+        for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
+            if i > 0 {
+                write!(self.stdout, ",")?;
+            }
+            self.format_value(key)?;
+            write!(self.stdout, ":")?;
+            self.format_value(value)?;
+        }
+        write!(self.stdout, "}}")?;
         Ok(())
     }
 }
