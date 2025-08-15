@@ -16,13 +16,22 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
+    let strip_comments = noargs::flag("strip-comments")
+        .short('s')
+        .take(&mut args)
+        .is_present();
+
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(());
     }
 
     let text = std::io::read_to_string(std::io::stdin())?;
-    let (json, comment_ranges) = nojson::RawJson::parse_jsonc(&text)?;
+    let (json, mut comment_ranges) = nojson::RawJson::parse_jsonc(&text)?;
+    if strip_comments {
+        comment_ranges.clear();
+    }
+
     let stdout = std::io::stdout();
     let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock());
     formatter.format(json.value())?;
