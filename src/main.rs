@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::io::StdoutLock;
+use std::io::{StdoutLock, Write};
 use std::ops::Range;
 
 fn main() -> noargs::Result<()> {
@@ -50,6 +50,21 @@ impl<'a> Formatter<'a> {
     }
 
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        todo!()
+        self.format_value(value)?;
+        writeln!(self.stdout)?;
+        Ok(())
+    }
+
+    fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        match value.kind() {
+            nojson::JsonValueKind::Null
+            | nojson::JsonValueKind::Boolean
+            | nojson::JsonValueKind::Integer
+            | nojson::JsonValueKind::Float
+            | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
+            nojson::JsonValueKind::Array => todo!(),
+            nojson::JsonValueKind::Object => todo!(),
+        }
+        Ok(())
     }
 }
