@@ -86,23 +86,24 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_trailing_comment(&mut self, next_position: usize) -> std::io::Result<()> {
-        let Some((comment_start, comment_end)) = self
-            .comment_ranges
-            .range(self.text_position..next_position)
-            .next()
-            .map(|x| (*x.0, *x.1))
-        else {
-            return Ok(());
-        };
-        if self.text[self.text_position..comment_start].contains('\n') {
-            return Ok(());
-        };
+        loop {
+            let Some((comment_start, comment_end)) = self
+                .comment_ranges
+                .range(self.text_position..next_position)
+                .next()
+                .map(|x| (*x.0, *x.1))
+            else {
+                return Ok(());
+            };
+            if self.text[self.text_position..comment_start].contains('\n') {
+                return Ok(());
+            };
 
-        // TODO: consider multi-line block comment
+            // TODO: consider multi-line block comment
 
-        write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
-
-        Ok(())
+            write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
+            self.comment_ranges.remove(&comment_start);
+        }
     }
 
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
