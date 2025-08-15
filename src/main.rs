@@ -36,6 +36,7 @@ struct Formatter<'a> {
     comment_ranges: BTreeMap<usize, usize>,
     stdout: StdoutLock<'a>,
     level: usize,
+    text_position: usize,
 }
 
 impl<'a> Formatter<'a> {
@@ -48,16 +49,22 @@ impl<'a> Formatter<'a> {
                 .collect(),
             stdout,
             level: 0,
+            text_position: 0,
         }
     }
 
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.format_value(value)?;
+        self.format_trailing_comment(self.text.len())?;
+
         writeln!(self.stdout)?;
+
+        // TODO: write normal comment if need
         Ok(())
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        self.format_normal_comment(value)?;
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
@@ -67,6 +74,34 @@ impl<'a> Formatter<'a> {
             nojson::JsonValueKind::Array => self.format_array(value)?,
             nojson::JsonValueKind::Object => self.format_object(value)?,
         }
+        self.text_position = value.position() + value.as_raw_str().len();
+        Ok(())
+    }
+
+    fn format_normal_comment(
+        &mut self,
+        _value: nojson::RawJsonValue<'_, '_>,
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn format_trailing_comment(&mut self, next_position: usize) -> std::io::Result<()> {
+        let Some((comment_start, comment_end)) = self
+            .comment_ranges
+            .range(self.text_position..next_position)
+            .next()
+            .map(|x| (*x.0, *x.1))
+        else {
+            return Ok(());
+        };
+        if self.text[self.text_position..comment_start].contains('\n') {
+            return Ok(());
+        };
+
+        // TODO: consider multi-line block comment
+
+        write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
+
         Ok(())
     }
 
@@ -74,20 +109,28 @@ impl<'a> Formatter<'a> {
         write!(self.stdout, "[")?;
         self.level += 1;
 
+        // TODO: write comment if need
+
         let newline = self.is_newline_needed(value);
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
+                self.format_trailing_comment(element.position())?;
             }
             if newline {
                 self.indent()?;
             }
             self.format_value(element)?;
         }
+        self.format_trailing_comment(value.position() + value.as_raw_str().len())?;
+
         self.level -= 1;
         if newline {
             self.indent()?
         }
+
+        // TODO: write comment if need
+
         write!(self.stdout, "]",)?;
         Ok(())
     }
@@ -100,6 +143,7 @@ impl<'a> Formatter<'a> {
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
+                self.format_trailing_comment(key.position())?;
             }
             if newline {
                 self.indent()?;
@@ -115,6 +159,8 @@ impl<'a> Formatter<'a> {
                 write!(self.stdout, " ")?;
             }
         }
+        self.format_trailing_comment(value.position() + value.as_raw_str().len())?;
+
         self.level -= 1;
         if newline {
             self.indent()?
