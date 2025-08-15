@@ -76,6 +76,10 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
+    fn contains_comment(&self, position: usize) -> bool {
+        self.comment_ranges.range(..position).next().is_some()
+    }
+
     fn format_comment(&mut self, position: usize) -> std::io::Result<()> {
         loop {
             let Some((comment_start, comment_end)) = self
@@ -143,12 +147,15 @@ impl<'a> Formatter<'a> {
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
-        self.format_comment(close_position)?;
 
         self.level -= 1;
         if newline {
-            self.indent()?
+            self.indent()?;
+            if self.contains_comment(close_position) {
+                write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
+            }
         }
+        self.format_comment(close_position)?;
 
         write!(self.stdout, "]",)?;
         Ok(())
@@ -180,12 +187,17 @@ impl<'a> Formatter<'a> {
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
-        self.format_comment(close_position)?;
 
         self.level -= 1;
         if newline {
-            self.indent()?
+            self.indent()?;
+            if self.contains_comment(close_position) {
+                write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
+            }
         }
+
+        self.format_comment(close_position)?;
+
         write!(self.stdout, "}}")?;
         Ok(())
     }
