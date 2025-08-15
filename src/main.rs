@@ -103,11 +103,17 @@ impl<'a> Formatter<'a> {
             }
             if newline {
                 self.indent()?;
+            } else {
+                write!(self.stdout, " ")?;
             }
 
             self.format_value(key)?;
             write!(self.stdout, ": ")?;
             self.format_value(value)?;
+
+            if !newline {
+                write!(self.stdout, " ")?;
+            }
         }
         self.level -= 1;
         if newline {
