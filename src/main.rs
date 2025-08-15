@@ -77,7 +77,6 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_comment(&mut self, position: usize) -> std::io::Result<()> {
-        let mut written = false;
         loop {
             let Some((comment_start, comment_end)) = self
                 .comment_ranges
@@ -85,15 +84,13 @@ impl<'a> Formatter<'a> {
                 .next()
                 .map(|x| (*x.0, *x.1))
             else {
-                if written {
-                    self.indent()?;
-                }
                 return Ok(());
             };
 
             let comment = &self.text[comment_start..comment_end];
             if comment.starts_with("//") {
                 write!(self.stdout, "{comment}")?;
+                self.indent()?;
             } else {
                 for (i, line) in comment.lines().enumerate() {
                     if i == 0 {
@@ -103,9 +100,9 @@ impl<'a> Formatter<'a> {
                         write!(self.stdout, "   {}", line.trim())?;
                     }
                 }
+                self.indent()?;
             }
             self.comment_ranges.remove(&comment_start);
-            written = true;
         }
     }
 
