@@ -57,65 +57,53 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<bool> {
+    fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
             | nojson::JsonValueKind::Integer
             | nojson::JsonValueKind::Float
-            | nojson::JsonValueKind::String => {
-                write!(self.stdout, "{}", value.as_raw_str())?;
-                Ok(false)
-            }
-            nojson::JsonValueKind::Array => self.format_array(value),
-            nojson::JsonValueKind::Object => self.format_object(value),
+            | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
+            nojson::JsonValueKind::Array => self.format_array(value)?,
+            nojson::JsonValueKind::Object => self.format_object(value)?,
         }
+        Ok(())
     }
 
-    fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<bool> {
+    fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "[")?;
         self.level += 1;
 
-        let mut newline = false;
+        let newline = self.is_newline_needed(value);
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
             }
-
-            write!(
-                self.stdout,
-                "\n{:width$}",
-                "",
-                width = self.level * INDENT_SIZE
-            )?;
-
-            newline |= self.format_value(element)?;
+            if newline {
+                self.indent()?;
+            }
+            self.format_value(element)?;
         }
         self.level -= 1;
         if newline {
             self.indent()?
         }
         write!(self.stdout, "]",)?;
-        Ok(newline)
+        Ok(())
     }
 
-    fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<bool> {
+    fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "{{")?;
         self.level += 1;
 
-        let mut newline = false;
+        let newline = self.is_newline_needed(value);
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
             }
-
-            write!(
-                self.stdout,
-                "\n{:width$}",
-                "",
-                width = self.level * INDENT_SIZE
-            )?;
-            newline = true;
+            if newline {
+                self.indent()?;
+            }
 
             self.format_value(key)?;
             write!(self.stdout, ": ")?;
@@ -126,7 +114,28 @@ impl<'a> Formatter<'a> {
             self.indent()?
         }
         write!(self.stdout, "}}")?;
-        Ok(true)
+        Ok(())
+    }
+
+    fn is_newline_needed(&self, value: nojson::RawJsonValue<'_, '_>) -> bool {
+        // TODO: consider comments
+        match value.kind() {
+            nojson::JsonValueKind::Null
+            | nojson::JsonValueKind::Boolean
+            | nojson::JsonValueKind::Integer
+            | nojson::JsonValueKind::Float
+            | nojson::JsonValueKind::String => false,
+            nojson::JsonValueKind::Array => value
+                .to_array()
+                .expect("bug")
+                .enumerate()
+                .any(|(i, value)| i > 0 || self.is_newline_needed(value)),
+            nojson::JsonValueKind::Object => value
+                .to_object()
+                .expect("bug")
+                .enumerate()
+                .any(|(i, (_, value))| i > 0 || self.is_newline_needed(value)),
+        }
     }
 
     fn indent(&mut self) -> std::io::Result<()> {
