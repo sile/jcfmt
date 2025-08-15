@@ -114,7 +114,9 @@ impl<'a> Formatter<'a> {
 
         let newline = self.is_newline_needed(value);
         for (i, element) in value.to_array().expect("bug").enumerate() {
-            if i > 0 {
+            if i == 0 {
+                self.format_trailing_comment(element.position())?;
+            } else {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(element.position())?;
             }
@@ -142,7 +144,9 @@ impl<'a> Formatter<'a> {
 
         let newline = self.is_newline_needed(value);
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
-            if i > 0 {
+            if i == 0 {
+                self.format_trailing_comment(key.position())?;
+            } else {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(key.position())?;
             }
