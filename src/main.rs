@@ -64,7 +64,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        self.format_normal_comment(value)?;
+        self.format_normal_comment(value.position())?;
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
@@ -78,32 +78,61 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_normal_comment(
-        &mut self,
-        _value: nojson::RawJsonValue<'_, '_>,
-    ) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    fn format_trailing_comment(&mut self, next_position: usize) -> std::io::Result<()> {
+    fn format_normal_comment(&mut self, position: usize) -> std::io::Result<()> {
+        let mut written = false;
         loop {
             let Some((comment_start, comment_end)) = self
                 .comment_ranges
-                .range(self.text_position..next_position)
+                .range(..position)
                 .next()
                 .map(|x| (*x.0, *x.1))
             else {
-                return Ok(());
-            };
-            if self.text[self.text_position..comment_end].contains('\n') {
+                if written {
+                    self.indent()?;
+                }
                 return Ok(());
             };
 
-            // TODO: consider multi-line block comment (should be treated as a normal comment)
-
-            write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
+            let comment = &self.text[comment_start..comment_end];
+            if comment.starts_with("//") {
+                write!(self.stdout, "{comment}")?;
+            } else {
+                for (i, line) in comment.lines().enumerate() {
+                    if i == 0 {
+                        write!(self.stdout, "{}", line.trim())?;
+                    } else {
+                        self.indent()?;
+                        write!(self.stdout, "   {}", line.trim())?;
+                    }
+                }
+            }
             self.comment_ranges.remove(&comment_start);
+            written = true;
         }
+    }
+
+    fn format_trailing_comment(&mut self, _next_position: usize) -> std::io::Result<()> {
+        Ok(())
+        /*
+                loop {
+                    let Some((comment_start, comment_end)) = self
+                        .comment_ranges
+                        .range(self.text_position..next_position)
+                        .next()
+                        .map(|x| (*x.0, *x.1))
+                    else {
+                        return Ok(());
+                    };
+                    if self.text[self.text_position..comment_end].contains('\n') {
+                        return Ok(());
+                    };
+
+                    // TODO: consider multi-line block comment (should be treated as a normal comment)
+
+                    write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
+                    self.comment_ranges.remove(&comment_start);
+                }
+        */
     }
 
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
