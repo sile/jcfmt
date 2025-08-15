@@ -95,11 +95,11 @@ impl<'a> Formatter<'a> {
             else {
                 return Ok(());
             };
-            if self.text[self.text_position..comment_start].contains('\n') {
+            if self.text[self.text_position..comment_end].contains('\n') {
                 return Ok(());
             };
 
-            // TODO: consider multi-line block comment
+            // TODO: consider multi-line block comment (should be treated as a normal comment)
 
             write!(self.stdout, " {}", &self.text[comment_start..comment_end])?;
             self.comment_ranges.remove(&comment_start);
