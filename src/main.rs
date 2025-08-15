@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::io::{StdoutLock, Write};
 use std::ops::Range;
 
+const INDENT_SIZE: usize = 2;
+
 fn main() -> noargs::Result<()> {
     let mut args = noargs::raw_args();
 
@@ -70,27 +72,57 @@ impl<'a> Formatter<'a> {
 
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "[")?;
+        self.level += 1;
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
             }
+
+            write!(
+                self.stdout,
+                "\n{:width$}",
+                "",
+                width = self.level * INDENT_SIZE
+            )?;
+
             self.format_value(element)?;
         }
-        write!(self.stdout, "]")?;
+        self.level -= 1;
+        write!(
+            self.stdout,
+            "\n{:width$}]",
+            "",
+            width = self.level * INDENT_SIZE
+        )?;
         Ok(())
     }
 
     fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "{{")?;
+        self.level += 1;
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
             }
+
+            write!(
+                self.stdout,
+                "\n{:width$}",
+                "",
+                width = self.level * INDENT_SIZE
+            )?;
+
             self.format_value(key)?;
-            write!(self.stdout, ":")?;
+            write!(self.stdout, ": ")?;
             self.format_value(value)?;
         }
-        write!(self.stdout, "}}")?;
+        self.level -= 1;
+        write!(
+            self.stdout,
+            "\n{:width$}}}",
+            "",
+            width = self.level * INDENT_SIZE
+        )?;
         Ok(())
     }
 }
