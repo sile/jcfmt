@@ -67,19 +67,14 @@ impl<'a> Formatter<'a> {
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.multiline_mode = self.is_newline_needed(value);
         self.format_value(value)?;
-        self.format_trailing_comment(self.text.len())?;
-        if !self.comment_ranges.is_empty() {
-            self.blank_line(self.text.len())?;
-            self.format_leading_comment(self.text.len())?;
-        }
+        self.format_comment(self.text.len())?;
         writeln!(self.stdout)?;
         Ok(())
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.multiline_mode {
-            self.format_trailing_comment(value.position())?;
-            self.format_leading_comment(value.position())?;
+            self.format_comment(value.position())?;
             self.blank_line(value.position())?;
             self.indent_value(value)?;
         }
@@ -98,8 +93,7 @@ impl<'a> Formatter<'a> {
 
     fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.contains_comment(value.position()) {
-            self.format_trailing_comment(value.position())?;
-            self.format_leading_comment(value.position())?;
+            self.format_comment(value.position())?;
             self.blank_line(value.position())?;
             self.indent_value(value)?;
         } else {
@@ -130,9 +124,7 @@ impl<'a> Formatter<'a> {
         }
 
         if self.multiline_mode && self.contains_comment(position) {
-            // TODO: factor out
-            self.format_trailing_comment(position)?;
-            self.format_leading_comment(position)?;
+            self.format_comment(position)?;
             self.blank_line(position)?;
             self.indent()?;
         }
@@ -147,6 +139,12 @@ impl<'a> Formatter<'a> {
 
     fn contains_comment(&self, position: usize) -> bool {
         self.comment_ranges.range(..position).next().is_some()
+    }
+
+    fn format_comment(&mut self, position: usize) -> std::io::Result<()> {
+        self.format_trailing_comment(position)?;
+        self.format_leading_comment(position)?;
+        Ok(())
     }
 
     fn format_leading_comment(&mut self, position: usize) -> std::io::Result<()> {
