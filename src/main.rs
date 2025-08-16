@@ -75,8 +75,7 @@ impl<'a> Formatter<'a> {
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.multiline_mode {
             self.format_comment(value.position())?;
-            self.blank_line(value.position())?;
-            self.indent_value(value)?;
+            self.indent(value.position())?;
         }
         match value.kind() {
             nojson::JsonValueKind::Null
@@ -94,8 +93,7 @@ impl<'a> Formatter<'a> {
     fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.contains_comment(value.position()) {
             self.format_comment(value.position())?;
-            self.blank_line(value.position())?;
-            self.indent_value(value)?;
+            self.indent(value.position())?;
         } else {
             write!(self.stdout, " ")?;
         }
@@ -111,6 +109,7 @@ impl<'a> Formatter<'a> {
         self.text_position = value.position() + value.as_raw_str().len();
         Ok(())
     }
+
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
         let mut position =
             self.text_position + self.text[self.text_position..].find(ch).expect("bug");
@@ -120,20 +119,19 @@ impl<'a> Formatter<'a> {
             .next_back()
             .is_some_and(|(_, &end)| position < end)
         {
-            position += self.text[position..].find(ch).expect("bug");
+            position += self.text[position..].find(ch).expect("bug") + 1;
         }
 
-        if self.multiline_mode && self.contains_comment(position) {
+        if matches!(ch, ']' | '}') || self.contains_comment(position) {
             self.format_comment(position)?;
-            self.blank_line(position)?;
-            self.indent()?;
+            self.indent(position)?;
         }
 
         write!(self.stdout, "{ch}")?;
         if !self.multiline_mode && matches!(ch, ',') {
             write!(self.stdout, " ")?;
         }
-        self.text_position = position + 1;
+        self.text_position = position;
         Ok(())
     }
 
@@ -158,20 +156,33 @@ impl<'a> Formatter<'a> {
                 return Ok(());
             };
 
-            // TODO: blank_line() (in indent()?)
-
-            self.indent()?;
+            self.indent(comment_start)?;
             self.text_position = comment_start;
             let comment = &self.text[comment_start..comment_end];
             if comment.starts_with("//") {
-                write!(self.stdout, "{comment}")?;
+                write!(self.stdout, "{}", comment.trim_end())?;
             } else {
-                for (i, line) in comment.lines().enumerate() {
+                let after_indent = self.level * INDENT_SIZE;
+                let before_indent = self.text[..comment_start]
+                    .lines()
+                    .next_back()
+                    .expect("bug")
+                    .len();
+                for (i, mut line) in comment.lines().enumerate() {
                     if i == 0 {
                         write!(self.stdout, "{}", line.trim())?;
+                    } else if let Some(delta) = after_indent.checked_sub(before_indent) {
+                        write!(self.stdout, "\n{:width$}", line.trim_end(), width = delta)?;
                     } else {
-                        self.indent()?;
-                        write!(self.stdout, "   {}", line.trim())?;
+                        let delta = before_indent - after_indent;
+                        for _ in 0..delta {
+                            if let Some(l) = line.strip_prefix(' ') {
+                                line = l;
+                            } else {
+                                break;
+                            };
+                        }
+                        write!(self.stdout, "\n{}", line.trim_end())?;
                     }
                 }
             }
@@ -194,7 +205,7 @@ impl<'a> Formatter<'a> {
                 return Ok(());
             }
 
-            let comment = &self.text[comment_start..comment_end];
+            let comment = self.text[comment_start..comment_end].trim_end();
             write!(self.stdout, " {comment}")?;
             self.comment_ranges.remove(&comment_start);
             self.text_position = comment_end;
@@ -214,13 +225,9 @@ impl<'a> Formatter<'a> {
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        self.format_trailing_comment(close_position)?;
-        self.format_leading_comment(close_position)?;
+        self.format_comment(close_position)?;
 
         self.level -= 1;
-        if self.multiline_mode {
-            self.indent()?;
-        }
         self.format_symbol(']')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
@@ -242,13 +249,9 @@ impl<'a> Formatter<'a> {
             self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        self.format_trailing_comment(close_position)?;
-        self.format_leading_comment(close_position)?;
+        self.format_comment(close_position)?;
 
         self.level -= 1;
-        if self.multiline_mode {
-            self.indent()?;
-        }
         self.format_symbol('}')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
@@ -275,26 +278,26 @@ impl<'a> Formatter<'a> {
             return Ok(());
         }
 
-        let text = &self.text[self.text_position..position];
-        let Some(offset) = text.find('\n') else {
+        let Some(offset) = self.text[self.text_position..position].find('\n') else {
             return Ok(());
         };
-        if !text[offset + 1..].contains('\n') {
+        self.text_position += offset + 1;
+
+        let Some(offset) = self.text[self.text_position..position].find('\n') else {
             return Ok(());
-        }
+        };
+        self.text_position += offset + 1;
+
         writeln!(self.stdout)?;
+
         Ok(())
     }
 
-    // TDOO:
-    fn indent_value(&mut self, _value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        self.indent()
-    }
-
-    fn indent(&mut self) -> std::io::Result<()> {
+    fn indent(&mut self, position: usize) -> std::io::Result<()> {
         if self.text_position == 0 {
             return Ok(());
         }
+        self.blank_line(position)?;
         write!(
             self.stdout,
             "\n{:width$}",
