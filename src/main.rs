@@ -175,7 +175,13 @@ impl<'a, W: Write> Formatter<'a, W> {
                     if i == 0 {
                         write!(self.writer, "{}", line.trim())?;
                     } else if let Some(delta) = after_indent.checked_sub(before_indent) {
-                        write!(self.writer, "\n{:width$}", line.trim_end(), width = delta)?;
+                        write!(
+                            self.writer,
+                            "\n{:width$}{}",
+                            "",
+                            line.trim_end(),
+                            width = delta
+                        )?;
                     } else {
                         let delta = before_indent - after_indent;
                         for _ in 0..delta {
