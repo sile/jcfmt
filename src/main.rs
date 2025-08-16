@@ -182,20 +182,17 @@ impl<'a> Formatter<'a> {
             if i > 0 {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(key.position())?;
+                if !newline {
+                    write!(self.stdout, " ")?;
+                }
             }
             if newline {
                 self.indent()?;
-            } else {
-                write!(self.stdout, " ")?;
             }
 
             self.format_value(key)?;
             write!(self.stdout, ": ")?;
             self.format_value(value)?;
-
-            if !newline {
-                write!(self.stdout, " ")?;
-            }
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
