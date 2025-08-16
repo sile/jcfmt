@@ -8,9 +8,7 @@ jcfmt
 
 `jcfmt` is a command-line tool to format JSONC (JSON with Comments) text.
 
-// TODO: Consider better presentation than "before / after formatting" pattern
-
-Before formatting:
+Before:
 ```jsonc
 {"name":"example", // App name
 
@@ -19,7 +17,7 @@ Before formatting:
 "features": ["auth","logging"]}
 ```
 
-After formatting:
+After:
 ```jsonc
 {
   "name": "example", // App name
