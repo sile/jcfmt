@@ -96,6 +96,27 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
+    fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        if self.contains_comment(value.position()) {
+            self.format_trailing_comment(value.position())?;
+            self.format_leading_comment(value.position())?;
+            self.blank_line(value.position())?;
+            self.indent_value(value)?;
+        } else {
+            write!(self.stdout, " ")?;
+        }
+        match value.kind() {
+            nojson::JsonValueKind::Null
+            | nojson::JsonValueKind::Boolean
+            | nojson::JsonValueKind::Integer
+            | nojson::JsonValueKind::Float
+            | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
+            nojson::JsonValueKind::Array => self.format_array(value)?,
+            nojson::JsonValueKind::Object => self.format_object(value)?,
+        }
+        self.text_position = value.position() + value.as_raw_str().len();
+        Ok(())
+    }
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
         let mut position =
             self.text_position + self.text[self.text_position..].find(ch).expect("bug");
@@ -117,7 +138,7 @@ impl<'a> Formatter<'a> {
         }
 
         write!(self.stdout, "{ch}")?;
-        if !self.multiline_mode && matches!(ch, ':' | ',') {
+        if !self.multiline_mode && matches!(ch, ',') {
             write!(self.stdout, " ")?;
         }
         self.text_position = position + 1;
@@ -220,7 +241,7 @@ impl<'a> Formatter<'a> {
 
             self.format_value(key)?;
             self.format_symbol(':')?;
-            self.format_value(value)?;
+            self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
