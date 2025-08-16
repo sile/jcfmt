@@ -76,12 +76,11 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        self.format_leading_comment(value.position())?;
         if self.multiline_mode {
             self.format_trailing_comment(value.position())?;
+            self.format_leading_comment(value.position())?;
             self.blank_line(value.position())?;
             self.indent_value(value)?;
-            self.format_leading_comment(self.text.len())?;
         }
         match value.kind() {
             nojson::JsonValueKind::Null
@@ -97,9 +96,29 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
+        let mut position =
+            self.text_position + self.text[self.text_position..].find(ch).expect("bug");
+        while self
+            .comment_ranges
+            .range(..position)
+            .next_back()
+            .is_some_and(|(_, &end)| position < end)
+        {
+            position += self.text[position..].find(ch).expect("bug");
+        }
+
+        if self.multiline_mode {
+            // TODO: factor out
+            //self.format_trailing_comment(position)?;
+            //self.blank_line(position)?;
+            //self.format_leading_comment(position)?;
+        }
+
         write!(self.stdout, "{ch}")?;
-        let position = self.text[self.text_position..].find(ch).expect("bug");
-        self.text_position += position + 1;
+        if !self.multiline_mode && matches!(ch, ':' | ',') {
+            write!(self.stdout, " ")?;
+        }
+        self.text_position = position + 1;
         Ok(())
     }
 
@@ -168,9 +187,6 @@ impl<'a> Formatter<'a> {
             if i > 0 {
                 self.format_symbol(',')?;
                 self.format_trailing_comment(element.position())?;
-                if !self.multiline_mode {
-                    write!(self.stdout, " ")?;
-                }
             }
             self.format_value(element)?;
         }
@@ -201,14 +217,10 @@ impl<'a> Formatter<'a> {
             if i > 0 {
                 self.format_symbol(',')?;
                 self.format_trailing_comment(key.position())?;
-                if !self.multiline_mode {
-                    write!(self.stdout, " ")?;
-                }
             }
 
             self.format_value(key)?;
             self.format_symbol(':')?;
-            write!(self.stdout, " ")?; // TODO
             self.format_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
@@ -257,6 +269,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
+    // TDOO:
     fn indent_value(&mut self, _value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.indent()
     }
