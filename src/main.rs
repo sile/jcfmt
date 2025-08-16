@@ -148,6 +148,9 @@ impl<'a> Formatter<'a> {
             if i > 0 {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(element.position())?;
+                if !newline {
+                    write!(self.stdout, " ")?;
+                }
             }
             if newline {
                 self.indent()?;
@@ -212,35 +215,19 @@ impl<'a> Formatter<'a> {
     }
 
     fn is_newline_needed(&self, value: nojson::RawJsonValue<'_, '_>) -> bool {
-        match value.kind() {
-            nojson::JsonValueKind::Null
-            | nojson::JsonValueKind::Boolean
-            | nojson::JsonValueKind::Integer
-            | nojson::JsonValueKind::Float
-            | nojson::JsonValueKind::String => false,
-            nojson::JsonValueKind::Array => {
-                self.is_comment_included(value)
-                    || value
-                        .to_array()
-                        .expect("bug")
-                        .enumerate()
-                        .any(|(i, value)| i > 0 || self.is_newline_needed(value))
-            }
-            nojson::JsonValueKind::Object => {
-                self.is_comment_included(value)
-                    || value
-                        .to_object()
-                        .expect("bug")
-                        .enumerate()
-                        .any(|(i, (_, value))| i > 0 || self.is_newline_needed(value))
-            }
-        }
+        self.is_comment_included(value) || self.is_newline_included(value)
     }
 
     fn is_comment_included(&self, value: nojson::RawJsonValue<'_, '_>) -> bool {
         let start = value.position();
         let end = start + value.as_raw_str().len();
         self.comment_ranges.range(start..end).next().is_some()
+    }
+
+    fn is_newline_included(&self, value: nojson::RawJsonValue<'_, '_>) -> bool {
+        let start = value.position();
+        let end = start + value.as_raw_str().len();
+        self.text[start..end].contains('\n')
     }
 
     fn indent(&mut self) -> std::io::Result<()> {
