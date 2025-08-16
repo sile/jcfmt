@@ -68,15 +68,20 @@ impl<'a> Formatter<'a> {
         self.format_value(value)?;
         self.format_trailing_comment(self.text.len())?;
         writeln!(self.stdout)?;
-        self.format_comment(self.text.len())?;
+        if !self.comment_ranges.is_empty() {
+            self.blank_line(self.text.len())?;
+            self.format_leading_comment(self.text.len())?;
+        }
         Ok(())
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        self.format_comment(value.position())?;
+        self.format_leading_comment(value.position())?;
         if self.multiline_mode {
-            self.blank_line(value)?;
+            self.format_trailing_comment(value.position())?;
+            self.blank_line(value.position())?;
             self.indent_value(value)?;
+            self.format_leading_comment(self.text.len())?;
         }
         match value.kind() {
             nojson::JsonValueKind::Null
@@ -102,7 +107,7 @@ impl<'a> Formatter<'a> {
         self.comment_ranges.range(..position).next().is_some()
     }
 
-    fn format_comment(&mut self, position: usize) -> std::io::Result<()> {
+    fn format_leading_comment(&mut self, position: usize) -> std::io::Result<()> {
         loop {
             let Some((comment_start, comment_end)) = self
                 .comment_ranges
@@ -179,7 +184,7 @@ impl<'a> Formatter<'a> {
                 write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
             }
         }
-        self.format_comment(close_position)?;
+        self.format_leading_comment(close_position)?;
 
         self.format_symbol(']')?;
         self.multiline_mode = old_multiline_mode;
@@ -217,7 +222,7 @@ impl<'a> Formatter<'a> {
             }
         }
 
-        self.format_comment(close_position)?;
+        self.format_leading_comment(close_position)?;
 
         self.format_symbol('}')?;
         self.multiline_mode = old_multiline_mode;
@@ -240,8 +245,8 @@ impl<'a> Formatter<'a> {
         self.text[start..end].contains('\n')
     }
 
-    fn blank_line(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        let text = &self.text[self.text_position..value.position()];
+    fn blank_line(&mut self, position: usize) -> std::io::Result<()> {
+        let text = &self.text[self.text_position..position];
         let Some(offset) = text.find('\n') else {
             return Ok(());
         };
