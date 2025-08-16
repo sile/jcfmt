@@ -186,22 +186,17 @@ impl<'a> Formatter<'a> {
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
-                self.format_trailing_comment(element.position())?;
             }
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
+        self.format_leading_comment(close_position)?;
 
         self.level -= 1;
         if self.multiline_mode {
             self.indent()?;
-            if self.contains_comment(close_position) {
-                write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
-            }
         }
-        self.format_leading_comment(close_position)?;
-
         self.format_symbol(']')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
@@ -216,7 +211,6 @@ impl<'a> Formatter<'a> {
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
-                self.format_trailing_comment(key.position())?;
             }
 
             self.format_value(key)?;
@@ -225,17 +219,12 @@ impl<'a> Formatter<'a> {
         }
         let close_position = value.position() + value.as_raw_str().len();
         self.format_trailing_comment(close_position)?;
+        self.format_leading_comment(close_position)?;
 
         self.level -= 1;
         if self.multiline_mode {
             self.indent()?;
-            if self.contains_comment(close_position) {
-                write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
-            }
         }
-
-        self.format_leading_comment(close_position)?;
-
         self.format_symbol('}')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
