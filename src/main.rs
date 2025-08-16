@@ -46,6 +46,7 @@ struct Formatter<'a> {
     stdout: StdoutLock<'a>,
     level: usize,
     text_position: usize,
+    multiline_mode: bool,
 }
 
 impl<'a> Formatter<'a> {
@@ -59,6 +60,7 @@ impl<'a> Formatter<'a> {
             stdout,
             level: 0,
             text_position: 0,
+            multiline_mode: false,
         }
     }
 
@@ -72,6 +74,9 @@ impl<'a> Formatter<'a> {
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.format_comment(value.position())?;
+        if self.multiline_mode {
+            self.indent()?;
+        }
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
@@ -139,21 +144,20 @@ impl<'a> Formatter<'a> {
             self.text_position = comment_end;
         }
     }
+
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "[")?;
         self.level += 1;
 
-        let newline = self.is_newline_needed(value);
+        let old_multiline_mode = self.multiline_mode;
+        self.multiline_mode = self.is_newline_needed(value);
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(element.position())?;
-                if !newline {
+                if !self.multiline_mode {
                     write!(self.stdout, " ")?;
                 }
-            }
-            if newline {
-                self.indent()?;
             }
             self.format_value(element)?;
         }
@@ -161,7 +165,7 @@ impl<'a> Formatter<'a> {
         self.format_trailing_comment(close_position)?;
 
         self.level -= 1;
-        if newline {
+        if self.multiline_mode {
             self.indent()?;
             if self.contains_comment(close_position) {
                 write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
@@ -170,6 +174,7 @@ impl<'a> Formatter<'a> {
         self.format_comment(close_position)?;
 
         write!(self.stdout, "]",)?;
+        self.multiline_mode = old_multiline_mode;
         Ok(())
     }
 
@@ -177,17 +182,15 @@ impl<'a> Formatter<'a> {
         write!(self.stdout, "{{")?;
         self.level += 1;
 
-        let newline = self.is_newline_needed(value);
+        let old_multiline_mode = self.multiline_mode;
+        self.multiline_mode = self.is_newline_needed(value);
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 write!(self.stdout, ",")?;
                 self.format_trailing_comment(key.position())?;
-                if !newline {
+                if !self.multiline_mode {
                     write!(self.stdout, " ")?;
                 }
-            }
-            if newline {
-                self.indent()?;
             }
 
             self.format_value(key)?;
@@ -198,7 +201,7 @@ impl<'a> Formatter<'a> {
         self.format_trailing_comment(close_position)?;
 
         self.level -= 1;
-        if newline {
+        if self.multiline_mode {
             self.indent()?;
             if self.contains_comment(close_position) {
                 write!(self.stdout, "{:width$}", "", width = INDENT_SIZE)?;
@@ -208,6 +211,7 @@ impl<'a> Formatter<'a> {
         self.format_comment(close_position)?;
 
         write!(self.stdout, "}}")?;
+        self.multiline_mode = old_multiline_mode;
         Ok(())
     }
 
