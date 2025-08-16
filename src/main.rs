@@ -194,6 +194,9 @@ impl<'a, W: Write> Formatter<'a, W> {
     }
 
     fn format_trailing_comment(&mut self, next_position: usize) -> std::io::Result<()> {
+        if self.text_position == 0 {
+            return Ok(());
+        };
         loop {
             let Some((comment_start, comment_end)) = self
                 .comment_ranges
@@ -276,10 +279,6 @@ impl<'a, W: Write> Formatter<'a, W> {
     }
 
     fn blank_line(&mut self, position: usize) -> std::io::Result<()> {
-        if self.text_position == 0 {
-            return Ok(());
-        }
-
         let Some(offset) = self.text[self.text_position..position].find('\n') else {
             return Ok(());
         };
