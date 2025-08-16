@@ -8,7 +8,25 @@ jcfmt
 
 `jcfmt` is a command-line tool to format JSONC (JSON with Comments) text.
 
+Key Features
+------------
+
+- **Comment-aware JSON formatting**:
+  - Supports both line comments (`//`) and block comments (`/* */`)
+- **Character preservation**:
+  - Only whitespace is adjusted
+  - all printable characters maintain their original order
+- **Content-aware newline insertion**:
+  - Uses multiline formatting when input contains newlines or comments within arrays and objects
+- **Blank line preservation**:
+  - Maintains blank lines when there are multiple successive newlines in input
+
+Installation
+------------
+
 ```console
+$ cargo install jcfmt
+
 $ jcfmt -h
 A command-line tool to format JSONC (JSON with Comments) text
 
@@ -18,18 +36,40 @@ Options:
       --version        Print version
   -h, --help           Print help ('--help' for full help, '-h' for summary)
   -s, --strip-comments Remove all comments from the JSON output
+```
 
+Examples
+--------
+
+```console
+// Simple example
 $ echo '{/*foo*/"bar":"baz"}' | jcfmt
 { /*foo*/
   "bar": "baz"
 }
-```
 
-Installation
-------------
+// Complex example
+$ cat example.jsonc
+{"name":"example", // App name
 
-```console
-$ cargo install jcfmt
+/* config and 
+   features */
+"config": {"debug": true, "port": 8080 /* TODO: fix later */},
+"features": ["auth", "logging"] 
+}
+
+$ cat example.jsonc | jcfmt
+{
+  "name": "example", // App name
+
+  /* config and
+     features */
+  "config": {
+    "debug": true,
+    "port": 8080 /* TODO: fix later */
+  },
+  "features": ["auth", "logging"]
+}
 ```
 
 JSONC
@@ -45,32 +85,4 @@ While there are various JSONC implementations,
   - Everything after `//` to the end of the line is treated as a comment
 - **Block comments**: `/* */`
   - Multi-line comments that can span across multiple lines
-
-### Example
-
-```jsonc
-{
-  // This is a line comment
-  "name": "example",
-
-  /* This is a block comment
-     that spans multiple lines */
-  "version": "1.0.0",
-
-  "config": {
-    "debug": true, // Another line comment
-    "port": 8080
-  }
-}
-```
-
-Formatting Behavior
--------------------
-
-MEMO:
-- formatting features
-  - preserving input printable char orders (only whitespaces are adjusted)
-  - consider input newline position (if array or map contains a newline, the direct children are formatted by multilinemode)
-  - preseving a newline if there more than two succesive newlines in the input
-  - etc
 
