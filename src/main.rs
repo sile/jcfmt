@@ -568,7 +568,9 @@ mod tests {
 
 }"#;
         let expected = r#"{
+
   "key": "value",
+
   "another": 42
 }
 "#;
