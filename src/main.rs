@@ -65,6 +65,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        self.format_leading_comment(value.position())?;
         self.format_value(value)?;
         self.format_trailing_comment(self.text.len())?;
         writeln!(self.stdout)?;
@@ -107,11 +108,12 @@ impl<'a> Formatter<'a> {
             position += self.text[position..].find(ch).expect("bug");
         }
 
-        if self.multiline_mode {
+        if self.multiline_mode && self.contains_comment(position) {
             // TODO: factor out
-            //self.format_trailing_comment(position)?;
-            //self.blank_line(position)?;
-            //self.format_leading_comment(position)?;
+            self.format_trailing_comment(position)?;
+            self.format_leading_comment(position)?;
+            self.blank_line(position)?;
+            self.indent()?;
         }
 
         write!(self.stdout, "{ch}")?;
