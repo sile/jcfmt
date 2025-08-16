@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::io::{StdoutLock, Write};
+use std::io::Write;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
@@ -42,24 +42,25 @@ fn main() -> noargs::Result<()> {
 }
 
 #[derive(Debug)]
-struct Formatter<'a> {
+struct Formatter<'a, W> {
     text: &'a str,
     comment_ranges: BTreeMap<usize, usize>,
-    stdout: StdoutLock<'a>,
+
+    writer: W,
     level: usize,
     text_position: usize,
     multiline_mode: bool,
 }
 
-impl<'a> Formatter<'a> {
-    fn new(text: &'a str, comment_ranges: Vec<Range<usize>>, stdout: StdoutLock<'a>) -> Self {
+impl<'a, W: Write> Formatter<'a, W> {
+    fn new(text: &'a str, comment_ranges: Vec<Range<usize>>, writer: W) -> Self {
         Self {
             text,
             comment_ranges: comment_ranges
                 .into_iter()
                 .map(|r| (r.start, r.end))
                 .collect(),
-            stdout,
+            writer,
             level: 0,
             text_position: 0,
             multiline_mode: false,
@@ -70,7 +71,7 @@ impl<'a> Formatter<'a> {
         self.multiline_mode = self.is_newline_needed(value);
         self.format_value(value)?;
         self.format_comments(self.text.len())?;
-        writeln!(self.stdout)?;
+        writeln!(self.writer)?;
         Ok(())
     }
 
@@ -88,7 +89,7 @@ impl<'a> Formatter<'a> {
             self.format_comments(value.position())?;
             self.indent(value.position())?;
         } else {
-            write!(self.stdout, " ")?;
+            write!(self.writer, " ")?;
         }
         self.format_value_content(value)?;
         Ok(())
@@ -100,7 +101,7 @@ impl<'a> Formatter<'a> {
             | nojson::JsonValueKind::Boolean
             | nojson::JsonValueKind::Integer
             | nojson::JsonValueKind::Float
-            | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
+            | nojson::JsonValueKind::String => write!(self.writer, "{}", value.as_raw_str())?,
             nojson::JsonValueKind::Array => self.format_array(value)?,
             nojson::JsonValueKind::Object => self.format_object(value)?,
         }
@@ -128,9 +129,9 @@ impl<'a> Formatter<'a> {
             self.indent(position)?;
         }
 
-        write!(self.stdout, "{ch}")?;
+        write!(self.writer, "{ch}")?;
         if !self.multiline_mode && matches!(ch, ',') {
-            write!(self.stdout, " ")?;
+            write!(self.writer, " ")?;
         }
         self.text_position = position;
         Ok(())
@@ -161,7 +162,7 @@ impl<'a> Formatter<'a> {
             self.text_position = comment_start;
             let comment = &self.text[comment_start..comment_end];
             if comment.starts_with("//") {
-                write!(self.stdout, "{}", comment.trim_end())?;
+                write!(self.writer, "{}", comment.trim_end())?;
             } else {
                 let after_indent = self.level * INDENT_SIZE;
                 let before_indent = self.text[..comment_start]
@@ -171,9 +172,9 @@ impl<'a> Formatter<'a> {
                     .len();
                 for (i, mut line) in comment.lines().enumerate() {
                     if i == 0 {
-                        write!(self.stdout, "{}", line.trim())?;
+                        write!(self.writer, "{}", line.trim())?;
                     } else if let Some(delta) = after_indent.checked_sub(before_indent) {
-                        write!(self.stdout, "\n{:width$}", line.trim_end(), width = delta)?;
+                        write!(self.writer, "\n{:width$}", line.trim_end(), width = delta)?;
                     } else {
                         let delta = before_indent - after_indent;
                         for _ in 0..delta {
@@ -183,7 +184,7 @@ impl<'a> Formatter<'a> {
                                 break;
                             };
                         }
-                        write!(self.stdout, "\n{}", line.trim_end())?;
+                        write!(self.writer, "\n{}", line.trim_end())?;
                     }
                 }
             }
@@ -207,7 +208,7 @@ impl<'a> Formatter<'a> {
             }
 
             let comment = self.text[comment_start..comment_end].trim_end();
-            write!(self.stdout, " {comment}")?;
+            write!(self.writer, " {comment}")?;
             self.comment_ranges.remove(&comment_start);
             self.text_position = comment_end;
         }
@@ -289,7 +290,7 @@ impl<'a> Formatter<'a> {
         };
         self.text_position += offset + 1;
 
-        writeln!(self.stdout)?;
+        writeln!(self.writer)?;
 
         Ok(())
     }
@@ -300,7 +301,7 @@ impl<'a> Formatter<'a> {
         }
         self.blank_line(position)?;
         write!(
-            self.stdout,
+            self.writer,
             "\n{:width$}",
             "",
             width = self.level * INDENT_SIZE
@@ -364,4 +365,14 @@ fn format_line_around_position(line: &str, column_pos: usize) -> (String, usize)
     }
 
     (result, new_column_pos)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn literals() {
+        //
+    }
 }
