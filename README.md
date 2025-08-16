@@ -72,8 +72,8 @@ $ cat example.jsonc | jcfmt
 }
 ```
 
-JSONC
------
+About JSONC
+-----------
 
 JSONC (JSON with Comments) extends standard JSON by allowing comments,
 making configuration files more readable and maintainable. 
