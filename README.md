@@ -25,12 +25,52 @@ $ echo '{/*foo*/"bar":"baz"}' | jcfmt
 }
 ```
 
+Installation
+------------
+
+```console
+$ cargo install jcfmt
+```
+
+JSONC
+-----
+
+JSONC (JSON with Comments) extends standard JSON by allowing comments,
+making configuration files more readable and maintainable. 
+
+While there are various JSONC implementations,
+`jcfmt` supports the two most common comment styles:
+
+- **Line comments**: `//`
+  - Everything after `//` to the end of the line is treated as a comment
+- **Block comments**: `/* */`
+  - Multi-line comments that can span across multiple lines
+
+### Example
+
+```jsonc
+{
+  // This is a line comment
+  "name": "example",
+
+  /* This is a block comment
+     that spans multiple lines */
+  "version": "1.0.0",
+
+  "config": {
+    "debug": true, // Another line comment
+    "port": 8080
+  }
+}
+```
+
+Formatting Behavior
+-------------------
+
 MEMO:
 - formatting features
   - preserving input printable char orders (only whitespaces are adjusted)
   - consider input newline position (if array or map contains a newline, the direct children are formatted by multilinemode)
   - preseving a newline if there more than two succesive newlines in the input
   - etc
-- unsupported (or notice)
-  - dones not allow trailing commas
 
