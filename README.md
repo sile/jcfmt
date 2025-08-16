@@ -70,6 +70,15 @@ $ cat example.jsonc | jcfmt
   },
   "features": ["auth", "logging"]
 }
+
+// The `--strip-comments` flag produces plain JSON output
+$ cat example.jsonc | jcfmt --strip-comments
+{
+  "name": "example",
+
+  "config": {"debug": true, "port": 8080},
+  "features": ["auth", "logging"]
+}
 ```
 
 About JSONC
