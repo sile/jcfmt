@@ -122,8 +122,11 @@ impl<'a> Formatter<'a> {
             position += self.text[position..].find(ch).expect("bug") + 1;
         }
 
-        if matches!(ch, ']' | '}') || self.contains_comment(position) {
+        if (self.multiline_mode && matches!(ch, ']' | '}')) || self.contains_comment(position) {
             self.format_comment(position)?;
+            if matches!(ch, ']' | '}') {
+                self.text_position = position - 1;
+            }
             self.indent(position)?;
         }
 
