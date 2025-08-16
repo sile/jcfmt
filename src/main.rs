@@ -75,6 +75,7 @@ impl<'a> Formatter<'a> {
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.format_comment(value.position())?;
         if self.multiline_mode {
+            self.blank_line(value)?;
             self.indent()?;
         }
         match value.kind() {
@@ -147,6 +148,7 @@ impl<'a> Formatter<'a> {
 
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "[")?;
+        self.text_position = value.position() + 1;
         self.level += 1;
 
         let old_multiline_mode = self.multiline_mode;
@@ -180,6 +182,7 @@ impl<'a> Formatter<'a> {
 
     fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         write!(self.stdout, "{{")?;
+        self.text_position = value.position() + 1;
         self.level += 1;
 
         let old_multiline_mode = self.multiline_mode;
@@ -229,6 +232,18 @@ impl<'a> Formatter<'a> {
         let start = value.position();
         let end = start + value.as_raw_str().len();
         self.text[start..end].contains('\n')
+    }
+
+    fn blank_line(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        let text = &self.text[self.text_position..value.position()];
+        let Some(offset) = text.find('\n') else {
+            return Ok(());
+        };
+        if !text[offset + 1..].contains('\n') {
+            return Ok(());
+        }
+        writeln!(self.stdout)?;
+        Ok(())
     }
 
     fn indent(&mut self) -> std::io::Result<()> {
