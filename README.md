@@ -12,11 +12,9 @@ Before formatting:
 ```jsonc
 {"name":"example", // App name
 
-/* config and 
-   features */
-"config": {"debug": true, "port": 8080 /* TODO: fix later */},
-"features": ["auth", "logging"] 
-}
+// config and features
+"config": {"debug":true, "port":8080/* TODO: fix later */},
+"features": ["auth","logging"]}
 ```
 
 After formatting:
@@ -24,8 +22,7 @@ After formatting:
 {
   "name": "example", // App name
 
-  /* config and
-     features */
+  // config and features
   "config": {
     "debug": true,
     "port": 8080 /* TODO: fix later */
