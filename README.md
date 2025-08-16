@@ -38,7 +38,7 @@ Key Features
   - Supports both line comments (`//`) and block comments (`/* */`)
 - **Character preservation**:
   - Only whitespace is adjusted
-  - all printable characters maintain their original order
+  - All printable characters maintain their original order
 - **Content-aware newline insertion**:
   - Uses multiline formatting when input contains newlines or comments within arrays and objects
 - **Blank line preservation**:
@@ -75,10 +75,10 @@ $ echo '{/*foo*/"bar":"baz"}' | jcfmt
 $ cat example.jsonc
 {"name":"example", // App name
 
-/* config and 
+/* config and
    features */
 "config": {"debug": true, "port": 8080 /* TODO: fix later */},
-"features": ["auth", "logging"] 
+"features": ["auth", "logging"]
 }
 
 $ cat example.jsonc | jcfmt
@@ -108,7 +108,7 @@ About JSONC
 -----------
 
 JSONC (JSON with Comments) extends standard JSON by allowing comments,
-making configuration files more readable and maintainable. 
+making configuration files more readable and maintainable.
 
 While there are various JSONC implementations,
 `jcfmt` supports the two most common comment styles:
