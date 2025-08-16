@@ -76,7 +76,7 @@ impl<'a> Formatter<'a> {
         self.format_comment(value.position())?;
         if self.multiline_mode {
             self.blank_line(value)?;
-            self.indent()?;
+            self.indent_value(value)?;
         }
         match value.kind() {
             nojson::JsonValueKind::Null
@@ -250,6 +250,10 @@ impl<'a> Formatter<'a> {
         }
         writeln!(self.stdout)?;
         Ok(())
+    }
+
+    fn indent_value(&mut self, _value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+        self.indent()
     }
 
     fn indent(&mut self) -> std::io::Result<()> {
