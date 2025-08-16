@@ -67,36 +67,32 @@ impl<'a> Formatter<'a> {
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         self.multiline_mode = self.is_newline_needed(value);
         self.format_value(value)?;
-        self.format_comment(self.text.len())?;
+        self.format_comments(self.text.len())?;
         writeln!(self.stdout)?;
         Ok(())
     }
 
     fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.multiline_mode {
-            self.format_comment(value.position())?;
+            self.format_comments(value.position())?;
             self.indent(value.position())?;
         }
-        match value.kind() {
-            nojson::JsonValueKind::Null
-            | nojson::JsonValueKind::Boolean
-            | nojson::JsonValueKind::Integer
-            | nojson::JsonValueKind::Float
-            | nojson::JsonValueKind::String => write!(self.stdout, "{}", value.as_raw_str())?,
-            nojson::JsonValueKind::Array => self.format_array(value)?,
-            nojson::JsonValueKind::Object => self.format_object(value)?,
-        }
-        self.text_position = value.position() + value.as_raw_str().len();
+        self.format_value_content(value)?;
         Ok(())
     }
 
     fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         if self.contains_comment(value.position()) {
-            self.format_comment(value.position())?;
+            self.format_comments(value.position())?;
             self.indent(value.position())?;
         } else {
             write!(self.stdout, " ")?;
         }
+        self.format_value_content(value)?;
+        Ok(())
+    }
+
+    fn format_value_content(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
@@ -123,7 +119,7 @@ impl<'a> Formatter<'a> {
         }
 
         if (self.multiline_mode && matches!(ch, ']' | '}')) || self.contains_comment(position) {
-            self.format_comment(position)?;
+            self.format_comments(position)?;
             if matches!(ch, ']' | '}') {
                 self.text_position = position - 1;
             }
@@ -142,7 +138,7 @@ impl<'a> Formatter<'a> {
         self.comment_ranges.range(..position).next().is_some()
     }
 
-    fn format_comment(&mut self, position: usize) -> std::io::Result<()> {
+    fn format_comments(&mut self, position: usize) -> std::io::Result<()> {
         self.format_trailing_comment(position)?;
         self.format_leading_comment(position)?;
         Ok(())
@@ -228,7 +224,7 @@ impl<'a> Formatter<'a> {
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        self.format_comment(close_position)?;
+        self.format_comments(close_position)?;
 
         self.level -= 1;
         self.format_symbol(']')?;
@@ -252,7 +248,7 @@ impl<'a> Formatter<'a> {
             self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        self.format_comment(close_position)?;
+        self.format_comments(close_position)?;
 
         self.level -= 1;
         self.format_symbol('}')?;
