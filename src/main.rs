@@ -65,14 +65,14 @@ impl<'a> Formatter<'a> {
     }
 
     fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        self.format_leading_comment(value.position())?;
+        self.multiline_mode = self.is_newline_needed(value);
         self.format_value(value)?;
         self.format_trailing_comment(self.text.len())?;
-        writeln!(self.stdout)?;
         if !self.comment_ranges.is_empty() {
             self.blank_line(self.text.len())?;
             self.format_leading_comment(self.text.len())?;
         }
+        writeln!(self.stdout)?;
         Ok(())
     }
 
@@ -139,10 +139,13 @@ impl<'a> Formatter<'a> {
                 return Ok(());
             };
 
+            // TODO: blank_line() (in indent()?)
+
+            self.indent()?;
+            self.text_position = comment_start;
             let comment = &self.text[comment_start..comment_end];
             if comment.starts_with("//") {
                 write!(self.stdout, "{comment}")?;
-                self.indent()?;
             } else {
                 for (i, line) in comment.lines().enumerate() {
                     if i == 0 {
@@ -152,9 +155,9 @@ impl<'a> Formatter<'a> {
                         write!(self.stdout, "   {}", line.trim())?;
                     }
                 }
-                self.indent()?;
             }
             self.comment_ranges.remove(&comment_start);
+            self.text_position = comment_end;
         }
     }
 
@@ -249,6 +252,10 @@ impl<'a> Formatter<'a> {
     }
 
     fn blank_line(&mut self, position: usize) -> std::io::Result<()> {
+        if self.text_position == 0 {
+            return Ok(());
+        }
+
         let text = &self.text[self.text_position..position];
         let Some(offset) = text.find('\n') else {
             return Ok(());
@@ -266,6 +273,9 @@ impl<'a> Formatter<'a> {
     }
 
     fn indent(&mut self) -> std::io::Result<()> {
+        if self.text_position == 0 {
+            return Ok(());
+        }
         write!(
             self.stdout,
             "\n{:width$}",
