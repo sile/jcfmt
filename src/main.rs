@@ -19,6 +19,7 @@ fn main() -> noargs::Result<()> {
 
     let strip_comments = noargs::flag("strip-comments")
         .short('s')
+        .doc("Remove all comments from the JSON output")
         .take(&mut args)
         .is_present();
 
