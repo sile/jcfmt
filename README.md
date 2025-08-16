@@ -1,4 +1,5 @@
-jccf (or jcfmt)
-====
+jcfmt
+=====
 
-**J**SON with **C**omments **C**oncise **F**ormat
+A command-line tool to format JSONC (JSON with Comments) text.
+
