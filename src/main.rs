@@ -111,7 +111,7 @@ impl<'a, W: Write> Formatter<'a, W> {
 
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
         let mut position =
-            self.text_position + self.text[self.text_position..].find(ch).expect("bug");
+            self.text_position + self.text[self.text_position..].find(ch).expect("bug") + 1;
         while self
             .comment_ranges
             .range(..position)
@@ -371,8 +371,208 @@ fn format_line_around_position(line: &str, column_pos: usize) -> (String, usize)
 mod tests {
     use super::*;
 
+    fn format(text: &str) -> String {
+        let (json, comment_ranges) = nojson::RawJson::parse_jsonc(text).expect("bug");
+        let mut buf = Vec::new();
+        let mut formatter = Formatter::new(&text, comment_ranges, &mut buf);
+        formatter.format(json.value()).expect("bug");
+        String::from_utf8(buf).expect("bug")
+    }
+
     #[test]
     fn literals() {
-        //
+        assert_eq!(format(" null  "), "null\n");
+        assert_eq!(format(" \t\n false\n\n  "), "false\n");
+        assert_eq!(format(" 1\n "), "1\n");
+        assert_eq!(format(" \n\"foo\" "), "\"foo\"\n");
+    }
+
+    #[test]
+    fn empty_containers() {
+        assert_eq!(format("[]"), "[]\n");
+        assert_eq!(format("{}"), "{}\n");
+        assert_eq!(format(" [ ] "), "[]\n");
+        assert_eq!(format(" { } "), "{}\n");
+    }
+
+    #[test]
+    fn arrays() {
+        assert_eq!(format("[1, 2, 3]"), "[1, 2, 3]\n");
+        assert_eq!(format("[1,2,3]"), "[1, 2, 3]\n");
+        assert_eq!(format("[ 1 , 2 , 3 ]"), "[1, 2, 3]\n");
+
+        // Multiline arrays
+        assert_eq!(format("[\n  1,\n  2,\n  3\n]"), "[\n  1,\n  2,\n  3\n]\n");
+
+        // Nested arrays
+        assert_eq!(format("[[1, 2], [3, 4]]"), "[[1, 2], [3, 4]]\n");
+        assert_eq!(
+            format("[\n  [1, 2],\n  [3, 4]\n]"),
+            "[\n  [1, 2],\n  [3, 4]\n]\n"
+        );
+    }
+
+    #[test]
+    fn objects() {
+        assert_eq!(format("{\"a\": 1}"), "{\"a\": 1}\n");
+        assert_eq!(format("{\"a\":1}"), "{\"a\": 1}\n");
+        assert_eq!(format("{ \"a\" : 1 }"), "{\"a\": 1}\n");
+
+        // Multiple properties
+        assert_eq!(format("{\"a\": 1, \"b\": 2}"), "{\"a\": 1, \"b\": 2}\n");
+
+        // Multiline objects
+        assert_eq!(
+            format("{\n  \"a\": 1,\n  \"b\": 2\n}"),
+            "{\n  \"a\": 1,\n  \"b\": 2\n}\n"
+        );
+
+        // Nested objects
+        assert_eq!(
+            format("{\"outer\": {\"inner\": 42}}"),
+            "{\"outer\": {\"inner\": 42}}\n"
+        );
+    }
+
+    #[test]
+    fn mixed_structures() {
+        assert_eq!(
+            format("{\"array\": [1, 2, 3], \"object\": {\"nested\": true}}"),
+            "{\"array\": [1, 2, 3], \"object\": {\"nested\": true}}\n"
+        );
+
+        assert_eq!(
+            format("[{\"a\": 1}, {\"b\": 2}]"),
+            "[{\"a\": 1}, {\"b\": 2}]\n"
+        );
+    }
+
+    #[test]
+    fn indentation() {
+        let input = r#"{
+"level1": {
+"level2": {
+"level3": "value"
+}
+}
+}"#;
+        let expected = r#"{
+  "level1": {
+    "level2": {
+      "level3": "value"
+    }
+  }
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn comments_single_line() {
+        let input = r#"{
+  "key": "value" // This is a comment
+}"#;
+        let expected = r#"{
+  "key": "value" // This is a comment
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn comments_multi_line() {
+        let input = r#"{
+  /* This is a
+     multi-line comment */
+  "key": "value"
+}"#;
+        let expected = r#"{
+  /* This is a
+     multi-line comment */
+  "key": "value"
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn comments_leading() {
+        let input = r#"// Leading comment
+{
+  "key": "value"
+}"#;
+        let expected = r#"// Leading comment
+{
+  "key": "value"
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn comments_mixed() {
+        let input = r#"{
+  // Comment before key
+  "key1": "value1", // Trailing comment
+  /* Block comment */
+  "key2": "value2"
+}"#;
+        let expected = r#"{
+  // Comment before key
+  "key1": "value1", // Trailing comment
+  /* Block comment */
+  "key2": "value2"
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn various_json_types() {
+        let input = r#"{
+  "null": null,
+  "boolean_true": true,
+  "boolean_false": false,
+  "integer": 42,
+  "float": 3.14,
+  "string": "hello world",
+  "empty_string": "",
+  "array": [],
+  "object": {}
+}"#;
+        let expected = r#"{
+  "null": null,
+  "boolean_true": true,
+  "boolean_false": false,
+  "integer": 42,
+  "float": 3.14,
+  "string": "hello world",
+  "empty_string": "",
+  "array": [],
+  "object": {}
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn whitespace_normalization() {
+        // Test excessive whitespace removal
+        let input = r#"{
+
+
+  "key"   :    "value"   ,
+
+
+  "another"  :   42
+
+
+}"#;
+        let expected = r#"{
+  "key": "value",
+  "another": 42
+}
+"#;
+        assert_eq!(format(input), expected);
     }
 }
