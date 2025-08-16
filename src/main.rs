@@ -91,6 +91,13 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
+    fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
+        write!(self.stdout, "{ch}")?;
+        let position = self.text[self.text_position..].find(ch).expect("bug");
+        self.text_position += position + 1;
+        Ok(())
+    }
+
     fn contains_comment(&self, position: usize) -> bool {
         self.comment_ranges.range(..position).next().is_some()
     }
@@ -147,15 +154,14 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        write!(self.stdout, "[")?;
-        self.text_position = value.position() + 1;
+        self.format_symbol('[')?;
         self.level += 1;
 
         let old_multiline_mode = self.multiline_mode;
         self.multiline_mode = self.is_newline_needed(value);
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
-                write!(self.stdout, ",")?;
+                self.format_symbol(',')?;
                 self.format_trailing_comment(element.position())?;
                 if !self.multiline_mode {
                     write!(self.stdout, " ")?;
@@ -175,21 +181,20 @@ impl<'a> Formatter<'a> {
         }
         self.format_comment(close_position)?;
 
-        write!(self.stdout, "]",)?;
+        self.format_symbol(']')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
     }
 
     fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
-        write!(self.stdout, "{{")?;
-        self.text_position = value.position() + 1;
+        self.format_symbol('{')?;
         self.level += 1;
 
         let old_multiline_mode = self.multiline_mode;
         self.multiline_mode = self.is_newline_needed(value);
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
-                write!(self.stdout, ",")?;
+                self.format_symbol(',')?;
                 self.format_trailing_comment(key.position())?;
                 if !self.multiline_mode {
                     write!(self.stdout, " ")?;
@@ -197,7 +202,8 @@ impl<'a> Formatter<'a> {
             }
 
             self.format_value(key)?;
-            write!(self.stdout, ": ")?;
+            self.format_symbol(':')?;
+            write!(self.stdout, " ")?; // TODO
             self.format_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
@@ -213,7 +219,7 @@ impl<'a> Formatter<'a> {
 
         self.format_comment(close_position)?;
 
-        write!(self.stdout, "}}")?;
+        self.format_symbol('}')?;
         self.multiline_mode = old_multiline_mode;
         Ok(())
     }
