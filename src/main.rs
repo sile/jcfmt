@@ -110,6 +110,26 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
+    fn has_trailing_comma(&self, close_position: usize) -> bool {
+        let Some(mut position) = self.text[self.text_position..close_position].find(',') else {
+            return false;
+        };
+        position += self.text_position;
+        while self
+            .comment_ranges
+            .range(..position)
+            .next_back()
+            .is_some_and(|(_, &comment_end)| position < comment_end)
+        {
+            position += 1;
+            let Some(offset) = self.text[position..close_position].find(',') else {
+                return false;
+            };
+            position += offset;
+        }
+        true
+    }
+
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
         let mut position =
             self.text_position + self.text[self.text_position..].find(ch).expect("bug") + 1;
@@ -237,6 +257,9 @@ impl<'a, W: Write> Formatter<'a, W> {
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
+        if self.has_trailing_comma(close_position) {
+            self.format_symbol(',')?;
+        }
         self.format_comments(close_position)?;
 
         self.level -= 1;
@@ -261,6 +284,9 @@ impl<'a, W: Write> Formatter<'a, W> {
             self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
+        if self.has_trailing_comma(close_position) {
+            self.format_symbol(',')?;
+        }
         self.format_comments(close_position)?;
 
         self.level -= 1;
