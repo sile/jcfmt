@@ -36,7 +36,8 @@ Key Features
 
 - **Comment-aware JSON formatting**:
   - Supports both line comments (`//`) and block comments (`/* */`)
-TODO: write about trailing comma
+- **Trailing comma preservation**:
+  - Maintains trailing commas in arrays and objects when present in the input
 - **Character preservation**:
   - Only whitespace is adjusted
   - All printable characters maintain their original order
