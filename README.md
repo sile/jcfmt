@@ -14,7 +14,7 @@ Before:
 
 // config and features
 "config": {"debug":true, "port":8080/* TODO: fix later */},
-"features": ["auth","logging"]}
+"features": ["auth","logging"]  ,}
 ```
 
 After:
@@ -27,7 +27,7 @@ After:
     "debug": true,
     "port": 8080 /* TODO: fix later */
   },
-  "features": ["auth", "logging"]
+  "features": ["auth", "logging"],
 }
 ```
 
@@ -36,6 +36,8 @@ Key Features
 
 - **Comment-aware JSON formatting**:
   - Supports both line comments (`//`) and block comments (`/* */`)
+- **Trailing comma preservation**:
+  - Maintains trailing commas in arrays and objects when present in the input
 - **Character preservation**:
   - Only whitespace is adjusted
   - All printable characters maintain their original order
@@ -56,9 +58,9 @@ A command-line tool to format JSONC (JSON with Comments) text
 Usage: jcfmt [OPTIONS]
 
 Options:
-      --version        Print version
-  -h, --help           Print help ('--help' for full help, '-h' for summary)
-  -s, --strip-comments Remove all comments from the JSON output
+      --version Print version
+  -h, --help    Print help ('--help' for full help, '-h' for summary)
+  -s, --strip   Remove all comments and trailing commas from the JSON output
 ```
 
 Examples
@@ -78,7 +80,7 @@ $ cat example.jsonc
 /* config and
    features */
 "config": {"debug": true, "port": 8080 /* TODO: fix later */},
-"features": ["auth", "logging"]
+"features": ["auth", "logging",  ],
 }
 
 $ cat example.jsonc | jcfmt
@@ -91,11 +93,11 @@ $ cat example.jsonc | jcfmt
     "debug": true,
     "port": 8080 /* TODO: fix later */
   },
-  "features": ["auth", "logging"]
+  "features": ["auth", "logging",],
 }
 
-// The `--strip-comments` flag produces plain JSON output
-$ cat example.jsonc | jcfmt --strip-comments
+// The `--strip` flag produces plain JSON output
+$ cat example.jsonc | jcfmt --strip
 {
   "name": "example",
 
@@ -103,18 +105,3 @@ $ cat example.jsonc | jcfmt --strip-comments
   "features": ["auth", "logging"]
 }
 ```
-
-About JSONC
------------
-
-JSONC (JSON with Comments) extends standard JSON by allowing comments,
-making configuration files more readable and maintainable.
-
-While there are various JSONC implementations,
-`jcfmt` supports the two most common comment styles:
-
-- **Line comments**: `//`
-  - Everything after `//` to the end of the line is treated as a comment
-- **Block comments**: `/* */`
-  - Multi-line comments that can span across multiple lines
-

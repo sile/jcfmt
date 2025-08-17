@@ -17,9 +17,9 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
-    let strip_comments = noargs::flag("strip-comments")
+    let strip = noargs::flag("strip")
         .short('s')
-        .doc("Remove all comments from the JSON output")
+        .doc("Remove all comments and trailing commas from the JSON output")
         .take(&mut args)
         .is_present();
 
@@ -29,14 +29,10 @@ fn main() -> noargs::Result<()> {
     }
 
     let text = std::io::read_to_string(std::io::stdin())?;
-    let (json, mut comment_ranges) =
+    let (json, comment_ranges) =
         nojson::RawJson::parse_jsonc(&text).map_err(|e| format_json_parse_error(&text, e))?;
-    if strip_comments {
-        comment_ranges.clear();
-    }
-
     let stdout = std::io::stdout();
-    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock());
+    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock(), strip);
     formatter.format(json.value())?;
 
     Ok(())
@@ -46,15 +42,18 @@ fn main() -> noargs::Result<()> {
 struct Formatter<'a, W> {
     text: &'a str,
     comment_ranges: BTreeMap<usize, usize>,
-
     writer: W,
     level: usize,
     text_position: usize,
     multiline_mode: bool,
+    strip: bool,
 }
 
 impl<'a, W: Write> Formatter<'a, W> {
-    fn new(text: &'a str, comment_ranges: Vec<Range<usize>>, writer: W) -> Self {
+    fn new(text: &'a str, mut comment_ranges: Vec<Range<usize>>, writer: W, strip: bool) -> Self {
+        if strip {
+            comment_ranges.clear();
+        }
         Self {
             text,
             comment_ranges: comment_ranges
@@ -65,6 +64,7 @@ impl<'a, W: Write> Formatter<'a, W> {
             level: 0,
             text_position: 0,
             multiline_mode: false,
+            strip,
         }
     }
 
@@ -110,6 +110,26 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
+    fn has_trailing_comma(&self, close_position: usize) -> bool {
+        let Some(mut position) = self.text[self.text_position..close_position].find(',') else {
+            return false;
+        };
+        position += self.text_position;
+        while self
+            .comment_ranges
+            .range(..position)
+            .next_back()
+            .is_some_and(|(_, &comment_end)| position < comment_end)
+        {
+            position += 1;
+            let Some(offset) = self.text[position..close_position].find(',') else {
+                return false;
+            };
+            position += offset;
+        }
+        true
+    }
+
     fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
         let mut position =
             self.text_position + self.text[self.text_position..].find(ch).expect("bug") + 1;
@@ -131,9 +151,6 @@ impl<'a, W: Write> Formatter<'a, W> {
         }
 
         write!(self.writer, "{ch}")?;
-        if !self.multiline_mode && matches!(ch, ',') {
-            write!(self.writer, " ")?;
-        }
         self.text_position = position;
         Ok(())
     }
@@ -233,10 +250,16 @@ impl<'a, W: Write> Formatter<'a, W> {
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
+                if !self.multiline_mode {
+                    write!(self.writer, " ")?;
+                }
             }
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
+        if !self.strip && self.has_trailing_comma(close_position) {
+            self.format_symbol(',')?;
+        }
         self.format_comments(close_position)?;
 
         self.level -= 1;
@@ -254,6 +277,9 @@ impl<'a, W: Write> Formatter<'a, W> {
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
+                if !self.multiline_mode {
+                    write!(self.writer, " ")?;
+                }
             }
 
             self.format_value(key)?;
@@ -261,6 +287,9 @@ impl<'a, W: Write> Formatter<'a, W> {
             self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
+        if !self.strip && self.has_trailing_comma(close_position) {
+            self.format_symbol(',')?;
+        }
         self.format_comments(close_position)?;
 
         self.level -= 1;
@@ -380,7 +409,7 @@ mod tests {
     fn format(text: &str) -> String {
         let (json, comment_ranges) = nojson::RawJson::parse_jsonc(text).expect("bug");
         let mut buf = Vec::new();
-        let mut formatter = Formatter::new(&text, comment_ranges, &mut buf);
+        let mut formatter = Formatter::new(&text, comment_ranges, &mut buf, false);
         formatter.format(json.value()).expect("bug");
         String::from_utf8(buf).expect("bug")
     }
@@ -579,6 +608,75 @@ mod tests {
   "key": "value",
 
   "another": 42
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
+
+    #[test]
+    fn trailing_commas() {
+        // Test trailing comma in array
+        let input = r#"[
+  1,
+  2,
+  3,
+]"#;
+        let expected = r#"[
+  1,
+  2,
+  3,
+]
+"#;
+        assert_eq!(format(input), expected);
+
+        let input = r#"[1,2,3,]"#;
+        let expected = r#"[1, 2, 3,]
+"#;
+        assert_eq!(format(input), expected);
+        // Test trailing comma in object
+        let input = r#"{
+  "key1": "value1",
+  "key2": "value2",
+}"#;
+        let expected = r#"{
+  "key1": "value1",
+  "key2": "value2",
+}
+"#;
+        assert_eq!(format(input), expected);
+
+        // Test trailing comma with comments
+        let input = r#"{
+  "key1": "value1", // Comment after value
+  "key2": "value2", // Another comment
+  // Final comment before trailing comma
+}"#;
+        let expected = r#"{
+  "key1": "value1", // Comment after value
+  "key2": "value2", // Another comment
+  // Final comment before trailing comma
+}
+"#;
+        assert_eq!(format(input), expected);
+
+        // Test nested structures with trailing commas
+        let input = r#"{
+  "array": [
+    1,
+    2,
+  ],
+  "object": {
+    "nested": true,
+  },
+}"#;
+        let expected = r#"{
+  "array": [
+    1,
+    2,
+  ],
+  "object": {
+    "nested": true,
+  },
 }
 "#;
         assert_eq!(format(input), expected);
