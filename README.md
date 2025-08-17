@@ -58,9 +58,9 @@ A command-line tool to format JSONC (JSON with Comments) text
 Usage: jcfmt [OPTIONS]
 
 Options:
-      --version        Print version
-  -h, --help           Print help ('--help' for full help, '-h' for summary)
-  -s, --strip-comments Remove all comments from the JSON output
+      --version Print version
+  -h, --help    Print help ('--help' for full help, '-h' for summary)
+  -s, --strip   Remove all comments and trailing commas from the JSON output
 ```
 
 Examples
@@ -96,7 +96,7 @@ $ cat example.jsonc | jcfmt
   "features": ["auth", "logging",],
 }
 
-// The `--strip-comments` flag produces plain JSON output
+// The `--strip` flag produces plain JSON output
 $ cat example.jsonc | jcfmt --strip-comments
 {
   "name": "example",

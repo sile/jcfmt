@@ -17,9 +17,9 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
-    let strip_comments = noargs::flag("strip-comments")
+    let strip = noargs::flag("strip")
         .short('s')
-        .doc("Remove all comments from the JSON output")
+        .doc("Remove all comments and trailing commas from the JSON output")
         .take(&mut args)
         .is_present();
 
@@ -29,14 +29,10 @@ fn main() -> noargs::Result<()> {
     }
 
     let text = std::io::read_to_string(std::io::stdin())?;
-    let (json, mut comment_ranges) =
+    let (json, comment_ranges) =
         nojson::RawJson::parse_jsonc(&text).map_err(|e| format_json_parse_error(&text, e))?;
-    if strip_comments {
-        comment_ranges.clear();
-    }
-
     let stdout = std::io::stdout();
-    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock());
+    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock(), strip);
     formatter.format(json.value())?;
 
     Ok(())
@@ -46,15 +42,18 @@ fn main() -> noargs::Result<()> {
 struct Formatter<'a, W> {
     text: &'a str,
     comment_ranges: BTreeMap<usize, usize>,
-
     writer: W,
     level: usize,
     text_position: usize,
     multiline_mode: bool,
+    strip: bool,
 }
 
 impl<'a, W: Write> Formatter<'a, W> {
-    fn new(text: &'a str, comment_ranges: Vec<Range<usize>>, writer: W) -> Self {
+    fn new(text: &'a str, mut comment_ranges: Vec<Range<usize>>, writer: W, strip: bool) -> Self {
+        if strip {
+            comment_ranges.clear();
+        }
         Self {
             text,
             comment_ranges: comment_ranges
@@ -65,6 +64,7 @@ impl<'a, W: Write> Formatter<'a, W> {
             level: 0,
             text_position: 0,
             multiline_mode: false,
+            strip,
         }
     }
 
@@ -257,7 +257,7 @@ impl<'a, W: Write> Formatter<'a, W> {
             self.format_value(element)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        if self.has_trailing_comma(close_position) {
+        if !self.strip && self.has_trailing_comma(close_position) {
             self.format_symbol(',')?;
         }
         self.format_comments(close_position)?;
@@ -287,7 +287,7 @@ impl<'a, W: Write> Formatter<'a, W> {
             self.format_member_value(value)?;
         }
         let close_position = value.position() + value.as_raw_str().len();
-        if self.has_trailing_comma(close_position) {
+        if !self.strip && self.has_trailing_comma(close_position) {
             self.format_symbol(',')?;
         }
         self.format_comments(close_position)?;
