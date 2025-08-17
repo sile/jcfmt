@@ -97,7 +97,7 @@ $ cat example.jsonc | jcfmt
 }
 
 // The `--strip` flag produces plain JSON output
-$ cat example.jsonc | jcfmt --strip-comments
+$ cat example.jsonc | jcfmt --strip
 {
   "name": "example",
 
