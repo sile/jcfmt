@@ -151,9 +151,6 @@ impl<'a, W: Write> Formatter<'a, W> {
         }
 
         write!(self.writer, "{ch}")?;
-        if !self.multiline_mode && matches!(ch, ',') {
-            write!(self.writer, " ")?;
-        }
         self.text_position = position;
         Ok(())
     }
@@ -253,6 +250,9 @@ impl<'a, W: Write> Formatter<'a, W> {
         for (i, element) in value.to_array().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
+                if !self.multiline_mode {
+                    write!(self.writer, " ")?;
+                }
             }
             self.format_value(element)?;
         }
@@ -277,6 +277,9 @@ impl<'a, W: Write> Formatter<'a, W> {
         for (i, (key, value)) in value.to_object().expect("bug").enumerate() {
             if i > 0 {
                 self.format_symbol(',')?;
+                if !self.multiline_mode {
+                    write!(self.writer, " ")?;
+                }
             }
 
             self.format_value(key)?;
@@ -626,6 +629,10 @@ mod tests {
 "#;
         assert_eq!(format(input), expected);
 
+        let input = r#"[1,2,3,]"#;
+        let expected = r#"[1, 2, 3,]
+"#;
+        assert_eq!(format(input), expected);
         // Test trailing comma in object
         let input = r#"{
   "key1": "value1",

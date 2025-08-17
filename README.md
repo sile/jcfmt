@@ -14,7 +14,7 @@ Before:
 
 // config and features
 "config": {"debug":true, "port":8080/* TODO: fix later */},
-"features": ["auth","logging"]}
+"features": ["auth","logging"]  ,}
 ```
 
 After:
@@ -27,7 +27,7 @@ After:
     "debug": true,
     "port": 8080 /* TODO: fix later */
   },
-  "features": ["auth", "logging"]
+  "features": ["auth", "logging"],
 }
 ```
 
@@ -78,7 +78,7 @@ $ cat example.jsonc
 /* config and
    features */
 "config": {"debug": true, "port": 8080 /* TODO: fix later */},
-"features": ["auth", "logging"]
+"features": ["auth", "logging",  ],
 }
 
 $ cat example.jsonc | jcfmt
@@ -91,7 +91,7 @@ $ cat example.jsonc | jcfmt
     "debug": true,
     "port": 8080 /* TODO: fix later */
   },
-  "features": ["auth", "logging"]
+  "features": ["auth", "logging",],
 }
 
 // The `--strip-comments` flag produces plain JSON output
