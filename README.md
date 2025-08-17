@@ -36,6 +36,7 @@ Key Features
 
 - **Comment-aware JSON formatting**:
   - Supports both line comments (`//`) and block comments (`/* */`)
+TODO: write about trailing comma
 - **Character preservation**:
   - Only whitespace is adjusted
   - All printable characters maintain their original order
@@ -103,18 +104,3 @@ $ cat example.jsonc | jcfmt --strip-comments
   "features": ["auth", "logging"]
 }
 ```
-
-About JSONC
------------
-
-JSONC (JSON with Comments) extends standard JSON by allowing comments,
-making configuration files more readable and maintainable.
-
-While there are various JSONC implementations,
-`jcfmt` supports the two most common comment styles:
-
-- **Line comments**: `//`
-  - Everything after `//` to the end of the line is treated as a comment
-- **Block comments**: `/* */`
-  - Multi-line comments that can span across multiple lines
-
