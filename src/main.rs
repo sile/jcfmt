@@ -583,4 +583,69 @@ mod tests {
 "#;
         assert_eq!(format(input), expected);
     }
+
+    #[test]
+    fn trailing_commas() {
+        // Test trailing comma in array
+        let input = r#"[
+  1,
+  2,
+  3,
+]"#;
+        let expected = r#"[
+  1,
+  2,
+  3,
+]
+"#;
+        assert_eq!(format(input), expected);
+
+        // Test trailing comma in object
+        let input = r#"{
+  "key1": "value1",
+  "key2": "value2",
+}"#;
+        let expected = r#"{
+  "key1": "value1",
+  "key2": "value2",
+}
+"#;
+        assert_eq!(format(input), expected);
+
+        // Test trailing comma with comments
+        let input = r#"{
+  "key1": "value1", // Comment after value
+  "key2": "value2", // Another comment
+  // Final comment before trailing comma
+}"#;
+        let expected = r#"{
+  "key1": "value1", // Comment after value
+  "key2": "value2", // Another comment
+  // Final comment before trailing comma
+}
+"#;
+        assert_eq!(format(input), expected);
+
+        // Test nested structures with trailing commas
+        let input = r#"{
+  "array": [
+    1,
+    2,
+  ],
+  "object": {
+    "nested": true,
+  },
+}"#;
+        let expected = r#"{
+  "array": [
+    1,
+    2,
+  ],
+  "object": {
+    "nested": true,
+  },
+}
+"#;
+        assert_eq!(format(input), expected);
+    }
 }
