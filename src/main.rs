@@ -421,10 +421,10 @@ mod tests {
 
     fn format(text: &str) -> String {
         let (json, comment_ranges) = nojson::RawJson::parse_jsonc(text).expect("bug");
-        let mut buf = Vec::new();
+        let mut buf = String::new();
         let mut formatter = Formatter::new(&text, comment_ranges, &mut buf, false);
         formatter.format(json.value()).expect("bug");
-        String::from_utf8(buf).expect("bug")
+        buf
     }
 
     #[test]
