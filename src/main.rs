@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::num::NonZeroUsize;
 use std::ops::Range;
+use std::path::PathBuf;
 
 const INDENT_SIZE: usize = 2;
 
@@ -22,6 +22,12 @@ fn main() -> noargs::Result<()> {
         .doc("Remove all comments and trailing commas from the JSON output")
         .take(&mut args)
         .is_present();
+    let output_file: Option<PathBuf> = noargs::opt("output-file")
+        .short('o')
+        .ty("PATH")
+        .doc("Write output to a file instead of stdout")
+        .take(&mut args)
+        .present_and_then(|a| a.value().parse())?;
 
     if let Some(help) = args.finish()? {
         print!("{help}");
@@ -31,9 +37,16 @@ fn main() -> noargs::Result<()> {
     let text = std::io::read_to_string(std::io::stdin())?;
     let (json, comment_ranges) =
         nojson::RawJson::parse_jsonc(&text).map_err(|e| format_json_parse_error(&text, e))?;
-    let stdout = std::io::stdout();
-    let mut formatter = Formatter::new(&text, comment_ranges, stdout.lock(), strip);
+
+    let mut output = String::new();
+    let mut formatter = Formatter::new(&text, comment_ranges, &mut output, strip);
     formatter.format(json.value())?;
+
+    if let Some(path) = output_file {
+        std::fs::write(path, output)?;
+    } else {
+        print!("{output}");
+    }
 
     Ok(())
 }
@@ -49,7 +62,7 @@ struct Formatter<'a, W> {
     strip: bool,
 }
 
-impl<'a, W: Write> Formatter<'a, W> {
+impl<'a, W: std::fmt::Write> Formatter<'a, W> {
     fn new(text: &'a str, mut comment_ranges: Vec<Range<usize>>, writer: W, strip: bool) -> Self {
         if strip {
             comment_ranges.clear();
@@ -68,7 +81,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         }
     }
 
-    fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         self.multiline_mode = self.is_newline_needed(value);
         self.format_value(value)?;
         self.format_comments(self.text.len())?;
@@ -76,7 +89,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
-    fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         if self.multiline_mode {
             self.format_comments(value.position())?;
             self.indent(value.position())?;
@@ -85,7 +98,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
-    fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format_member_value(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         if self.contains_comment(value.position()) {
             self.format_comments(value.position())?;
             self.indent(value.position())?;
@@ -96,7 +109,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
-    fn format_value_content(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format_value_content(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         match value.kind() {
             nojson::JsonValueKind::Null
             | nojson::JsonValueKind::Boolean
@@ -130,7 +143,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         true
     }
 
-    fn format_symbol(&mut self, ch: char) -> std::io::Result<()> {
+    fn format_symbol(&mut self, ch: char) -> std::fmt::Result {
         let mut position =
             self.text_position + self.text[self.text_position..].find(ch).expect("bug") + 1;
         while self
@@ -159,13 +172,13 @@ impl<'a, W: Write> Formatter<'a, W> {
         self.comment_ranges.range(..position).next().is_some()
     }
 
-    fn format_comments(&mut self, position: usize) -> std::io::Result<()> {
+    fn format_comments(&mut self, position: usize) -> std::fmt::Result {
         self.format_trailing_comment(position)?;
         self.format_leading_comment(position)?;
         Ok(())
     }
 
-    fn format_leading_comment(&mut self, position: usize) -> std::io::Result<()> {
+    fn format_leading_comment(&mut self, position: usize) -> std::fmt::Result {
         loop {
             let Some((comment_start, comment_end)) = self
                 .comment_ranges
@@ -217,7 +230,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         }
     }
 
-    fn format_trailing_comment(&mut self, next_position: usize) -> std::io::Result<()> {
+    fn format_trailing_comment(&mut self, next_position: usize) -> std::fmt::Result {
         if self.text_position == 0 {
             return Ok(());
         };
@@ -241,7 +254,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         }
     }
 
-    fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format_array(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         self.format_symbol('[')?;
         self.level += 1;
 
@@ -268,7 +281,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
-    fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::io::Result<()> {
+    fn format_object(&mut self, value: nojson::RawJsonValue<'_, '_>) -> std::fmt::Result {
         self.format_symbol('{')?;
         self.level += 1;
 
@@ -314,7 +327,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         self.text[start..end].contains('\n')
     }
 
-    fn blank_line(&mut self, position: usize) -> std::io::Result<()> {
+    fn blank_line(&mut self, position: usize) -> std::fmt::Result {
         let Some(offset) = self.text[self.text_position..position].find('\n') else {
             return Ok(());
         };
@@ -330,7 +343,7 @@ impl<'a, W: Write> Formatter<'a, W> {
         Ok(())
     }
 
-    fn indent(&mut self, position: usize) -> std::io::Result<()> {
+    fn indent(&mut self, position: usize) -> std::fmt::Result {
         if self.text_position == 0 {
             return Ok(());
         }
@@ -408,10 +421,10 @@ mod tests {
 
     fn format(text: &str) -> String {
         let (json, comment_ranges) = nojson::RawJson::parse_jsonc(text).expect("bug");
-        let mut buf = Vec::new();
+        let mut buf = String::new();
         let mut formatter = Formatter::new(&text, comment_ranges, &mut buf, false);
         formatter.format(json.value()).expect("bug");
-        String::from_utf8(buf).expect("bug")
+        buf
     }
 
     #[test]
